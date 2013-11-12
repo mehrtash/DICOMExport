@@ -17,7 +17,7 @@
 //
 namespace
 {
-
+std::string getTagValue(const std::string & entryID, const itk::MetaDataDictionary & inputDictionary);
 template <class T>
 int DoIt( int argc, char * argv[], T )
 {
@@ -37,7 +37,8 @@ int DoIt( int argc, char * argv[], T )
 
   ImageIOType::Pointer gdcmIO = ImageIOType::New();
 
-  /*
+
+
   NamesGeneratorType::Pointer namesGenerator = NamesGeneratorType::New();
 
   namesGenerator->SetInputDirectory( inputDirectory );
@@ -49,12 +50,12 @@ int DoIt( int argc, char * argv[], T )
   std::cout<<"Number of fileNames:"<<std::endl;
   std::cout << numberOfFilenames << std::endl;
 
+  /*
   for(unsigned int fni = 0; fni<numberOfFilenames; fni++)
     {
-    std::cout << "filename # " << fni << " = ";
-    std::cout << filenames[fni] << std::endl;
+   std::cout << filenames[fni] << std::endl;
     }
-
+  */
   ReaderType::Pointer reader = ReaderType::New();
 
   reader->SetImageIO( gdcmIO );
@@ -71,55 +72,35 @@ int DoIt( int argc, char * argv[], T )
     std::cerr << excp << std::endl;
     return EXIT_FAILURE;
     }
-*/
-
-  // Reading Dictionary
-  //typedef itk::MetaDataDictionary DictionaryType;
-
-  /*
-  const DictionaryType & dictionary = gdcmIO->GetMetaDataDictionary();
-
-  typedef itk::MetaDataObject<std::string> MetaDataStringType;
-  DictionaryType::ConstIterator itr = dictionary.Begin();
-  DictionaryType::ConstIterator end = dictionary.End();
-
-  while (itr != end)
-  {
-      itk::MetaDataObjectBase::Pointer entry = itr->second;
-      MetaDataStringType::Pointer entryvalue =
-              dynamic_cast<MetaDataStringType *>(entry.GetPointer());
-      if (entryvalue)
-      {
-          std::string tagKey = itr->first;
-          std::string tagValue = entryvalue->GetMetaDataObjectValue();
-          std::cout<<tagKey<<"="<<tagValue<<std::endl;
-      }
-      ++itr;
-  }
-
-*/
 
 
+
+  typedef itk::MetaDataDictionary DictionaryType;
+  DictionaryType & inputDictionary =gdcmIO->GetMetaDataDictionary()  ;
+
+  std::string  patientNameValue = getTagValue("0010|0010",inputDictionary);
+  std::string  patientIDValue = getTagValue("0010|0020",inputDictionary);
+  std::string  studyIDValue = getTagValue("0020|0010",inputDictionary);
+  std::string  studyInstanceUIDValue = getTagValue("0020|000d",inputDictionary);
+
+
+//----------------------------------------------------------------------------
+  ImageIOType::Pointer gdcmIO2 = ImageIOType::New();
   typename ReaderType::Pointer imageReader = ReaderType::New();
-    try{
-        imageReader->SetFileName(inputVolume.c_str());
-        imageReader->Update();
-
-
-    }
-    catch(itk::ExceptionObject & excp){
-        std::cerr<<"Exception thrown while reading the image file: "<<inputVolume<<std::endl;
-
-    return EXIT_FAILURE;
+    try
+    {
+      imageReader->SetFileName(inputVolume.c_str());
+      imageReader->Update();
     }
 
+    catch(itk::ExceptionObject & excp)
+    {
+      std::cerr<<"Exception thrown while reading the image file: "<<inputVolume<<std::endl;
+      return EXIT_FAILURE;
+    }
 
   ImageType::Pointer image = ImageType::New();
-   image = imageReader->GetOutput();
-
-   //  seriesWriter->
-//  seriesWriter->SetInput( reader->GetOutput() );
-
+  image = imageReader->GetOutput();
 
    const char * outputDICOMDirectory = outputDirectory.c_str();
    itksys::SystemTools::MakeDirectory( outputDICOMDirectory );
@@ -128,22 +109,27 @@ int DoIt( int argc, char * argv[], T )
    const unsigned int      OutputDimension = 2;
 
    typedef itk::Image< OutputPixelType, OutputDimension >    Image2DType;
-
    typedef itk::ImageSeriesWriter<ImageType, Image2DType >  SeriesWriterType;
 
    SeriesWriterType::Pointer seriesWriter = SeriesWriterType::New();
 
-   typedef itk::MetaDataDictionary DictionaryType;
-   DictionaryType  outputDictionary ;
-   itk::EncapsulateMetaData<std::string>(outputDictionary, "0010|0010", std::string("Gholoom") );
    typedef itk::NumericSeriesFileNames         NumericNamesGeneratorType;
-   //image->SetMetaDataDictionary(outputDictionary);
-
 
    NumericNamesGeneratorType::Pointer outputNamesGenerator = NumericNamesGeneratorType::New();
 
    seriesWriter->SetInput(image);
-   seriesWriter->SetImageIO( gdcmIO );
+   seriesWriter->SetImageIO( gdcmIO2 );
+
+   DictionaryType & outputDictionary =gdcmIO2->GetMetaDataDictionary()  ;
+   itk::EncapsulateMetaData<std::string>(outputDictionary, "0010|0010", patientNameValue.c_str() );
+   itk::EncapsulateMetaData<std::string>(outputDictionary, "0010|0020", patientIDValue.c_str() );
+   itk::EncapsulateMetaData<std::string>(outputDictionary, "0020|0010", studyIDValue.c_str() );
+   itk::EncapsulateMetaData<std::string>(outputDictionary, "0020|000d", studyInstanceUIDValue.c_str() );
+
+
+
+
+   gdcmIO2->SetMetaDataDictionary(outputDictionary);
 
   std::string format = outputDirectory;
 
@@ -151,23 +137,15 @@ int DoIt( int argc, char * argv[], T )
 
   outputNamesGenerator->SetSeriesFormat( format.c_str() );
 
-  //outputNamesGenerator->SetOutputDirectory( outputDirectory );
-
-   ImageType::RegionType region =
-   image->GetLargestPossibleRegion();
+   ImageType::RegionType region = image->GetLargestPossibleRegion();
 
    ImageType::IndexType start = region.GetIndex();
    ImageType::SizeType  size  = region.GetSize();
-
-
-   //outputNamesGenerator->SetSeriesFormat( format.c_str() );
 
    outputNamesGenerator->SetStartIndex( start[2] );
    outputNamesGenerator->SetEndIndex( start[2] + size[2] - 1 );
    outputNamesGenerator->SetIncrementIndex( 1 );
    seriesWriter->SetFileNames( outputNamesGenerator->GetFileNames() );
-   // seriesWriter->SetMetaDataDictionaryArray(
-     //                   reader->GetMetaDataDictionaryArray() );
 
   try
     {
@@ -184,7 +162,44 @@ int DoIt( int argc, char * argv[], T )
   return EXIT_SUCCESS;
 }
 
+std::string getTagValue(const std::string & entryId, const itk::MetaDataDictionary & inputDictionary)
+
+{
+  typedef itk::MetaDataDictionary DictionaryType;
+  typedef itk::MetaDataObject< std::string > MetaDataStringType;
+
+  DictionaryType::ConstIterator tagItr = inputDictionary.Find( entryId );
+  DictionaryType::ConstIterator end = inputDictionary.End();
+
+  std::string tagvalue;
+  if( tagItr != end )
+  {
+    MetaDataStringType::ConstPointer entryvalue =
+    dynamic_cast<const MetaDataStringType *>(tagItr->second.GetPointer() );
+
+    if( entryvalue )
+   {
+     tagvalue = entryvalue->GetMetaDataObjectValue();
+     std::cout << "(" << entryId <<  ") ";
+     std::cout << " is: " << tagvalue.c_str() << std::endl;
+   }
+  }
+
+return tagvalue;
+}
+
+
 } // end of anonymous namespace
+
+
+
+
+
+
+
+
+
+
 
 int main( int argc, char * argv[] )
 {
