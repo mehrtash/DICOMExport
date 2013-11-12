@@ -20,7 +20,8 @@
 //
 namespace
 {
-std::string getTagValue(const std::string & entryID, const itk::MetaDataDictionary & inputDictionary);
+std::string getTagValue(const std::string & entryID,
+                        const itk::MetaDataDictionary & inputDictionary);
 
 template <class T>
 int DoIt( int argc, char * argv[], T )
@@ -37,15 +38,18 @@ int DoIt( int argc, char * argv[], T )
   typedef itk::GDCMImageIO                        ImageIOType;
   typedef itk::GDCMSeriesFileNames                NamesGeneratorType;
 
-  typedef itk::Image<InputPixelType, 3>                        Image3DType;
-  typedef itk::Image<InputPixelType, 2>                        Image2DType;
+  typedef itk::Image<InputPixelType, 3>         Image3DType;
+  typedef itk::Image<InputPixelType, 2>         Image2DType;
 
-  typedef itk::ImageFileWriter<Image2DType>                    WriterType;
+  typedef itk::ImageFileWriter<Image2DType>     WriterType;
 
   ImageIOType::Pointer gdcmIO = ImageIOType::New();
 
-  NamesGeneratorType::Pointer namesGenerator = NamesGeneratorType::New();
+  // Reading the input DICOCM directory and get the
+  // attribute values which needs to be copied to the
+  //output DICOM directory
 
+  NamesGeneratorType::Pointer namesGenerator = NamesGeneratorType::New();
   namesGenerator->SetInputDirectory( inputDirectory );
 
   const ReaderType::FileNamesContainer & filenames =
@@ -77,7 +81,7 @@ int DoIt( int argc, char * argv[], T )
   std::string  studyInstanceUIDValue = getTagValue("0020|000d",inputDictionary);
 
 
-//----------------------------------------------------------------------------
+// Read the input image
 
   typedef itk::ImageFileReader<Image3DType>                    imageReaderType;
   typename Image3DType::Pointer image;
@@ -96,26 +100,31 @@ int DoIt( int argc, char * argv[], T )
       return EXIT_FAILURE;
       }
 
-  //image = imageReader->GetOutput();
-
-  // Image parameters
 
   unsigned int numberOfSlices = image->GetLargestPossibleRegion().GetSize()[2];
 
   typename Image3DType::SpacingType   spacing = image->GetSpacing();
   typename Image3DType::DirectionType oMatrix = image->GetDirection();
 
-  DictionaryType       dictionary;
+  // create a dictionary and populate it for each 2D instance
+  // and write each frame
+  //mostly adobted from CreateDICOMSeries CLI module
 
-  // Populating dictionary for each 2D instance and writing to file
+  DictionaryType       dictionary;
 
   for( unsigned int i = 0; i < numberOfSlices; i++ )
   {
+      // tag values from the input dicom directory
+  itk::EncapsulateMetaData<std::string>(dictionary, "0010|0010", patientNameValue.c_str() );
+  itk::EncapsulateMetaData<std::string>(dictionary, "0010|0020", patientIDValue.c_str() );
+  itk::EncapsulateMetaData<std::string>(dictionary, "0020|0010", studyIDValue.c_str() );
+  itk::EncapsulateMetaData<std::string>(dictionary, "0020|000d", studyInstanceUIDValue.c_str() );
 
   itksys_ios::ostringstream value;
 
   typename Image3DType::PointType    origin;
   typename Image3DType::IndexType    index;
+
   index.Fill(0);
   index[2] = i;
   image->TransformIndexToPhysicalPoint(index, origin);
@@ -124,9 +133,9 @@ int DoIt( int argc, char * argv[], T )
   itk::EncapsulateMetaData<std::string>(dictionary, "0020|0032", value.str() );
   value.str("");
   value << i + 1;
-  itk::EncapsulateMetaData<std::string>(dictionary, "0020|0013", value.str() );
+  itk::EncapsulateMetaData<std::string>(dictionary, "0020|0013", value.str() );// Instance Number
   itk::EncapsulateMetaData<std::string>(dictionary, "0008|0008", std::string("ORIGINAL\\PRIMARY\\AXIAL") );  // Image Type
-  itk::EncapsulateMetaData<std::string>(dictionary, "0008|0016", std::string("1.2.840.10008.5.1.4.1.1.2") ); // SOP Class UID
+  //itk::EncapsulateMetaData<std::string>(dictionary, "0008|0016", std::string("1.2.840.10008.5.1.4.1.1.2") ); // SOP Class UID
   value.str("");
   value << oMatrix[0][0] << "\\" << oMatrix[1][0] << "\\" << oMatrix[2][0] << "\\";
   value << oMatrix[0][1] << "\\" << oMatrix[1][1] << "\\" << oMatrix[2][1];
@@ -135,87 +144,83 @@ int DoIt( int argc, char * argv[], T )
   value << spacing[2];
   itk::EncapsulateMetaData<std::string>(dictionary, "0018|0050", value.str() ); // Slice Thickness
 
-  itk::EncapsulateMetaData<std::string>(dictionary, "0010|0010", patientNameValue.c_str() );
-  itk::EncapsulateMetaData<std::string>(dictionary, "0010|0020", patientIDValue.c_str() );
-  itk::EncapsulateMetaData<std::string>(dictionary, "0020|0010", studyIDValue.c_str() );
-  itk::EncapsulateMetaData<std::string>(dictionary, "0020|000d", studyInstanceUIDValue.c_str() );
-  typename Image3DType::RegionType extractRegion;
-      typename Image3DType::SizeType   extractSize;
-      typename Image3DType::IndexType  extractIndex;
-      extractSize = image->GetLargestPossibleRegion().GetSize();
-      extractIndex.Fill(0);
-      extractIndex[2] = i;
-      extractSize[2] = 0;
-      extractRegion.SetSize(extractSize);
-      extractRegion.SetIndex(extractIndex);
 
-      typedef itk::ExtractImageFilter<Image3DType, Image2DType> ExtractType;
-      typename ExtractType::Pointer extract = ExtractType::New();
+  typename Image3DType::RegionType extractRegion;
+  typename Image3DType::SizeType   extractSize;
+  typename Image3DType::IndexType  extractIndex;
+  extractSize = image->GetLargestPossibleRegion().GetSize();
+  extractIndex.Fill(0);
+  extractIndex[2] = i;
+  extractSize[2] = 0;
+  extractRegion.SetSize(extractSize);
+  extractRegion.SetIndex(extractIndex);
+
+  typedef itk::ExtractImageFilter<Image3DType, Image2DType> ExtractType;
+  typename ExtractType::Pointer extract = ExtractType::New();
   #if  ITK_VERSION_MAJOR >= 4
       extract->SetDirectionCollapseToGuess();  // ITKv3 compatible, but not recommended
   #endif
-      extract->SetInput(image );
-      extract->SetExtractionRegion(extractRegion);
-      extract->GetOutput()->SetMetaDataDictionary(dictionary);
-      extract->Update();
+   extract->SetInput(image );
+   extract->SetExtractionRegion(extractRegion);
+   extract->GetOutput()->SetMetaDataDictionary(dictionary);
+  extract->Update();
 
-      itk::ImageRegionIterator<Image2DType> it( extract->GetOutput(), extract->GetOutput()->GetLargestPossibleRegion() );
-      typename Image2DType::PixelType                minValue = itk::NumericTraits<typename Image2DType::PixelType>::max();
-      typename Image2DType::PixelType                maxValue = itk::NumericTraits<typename Image2DType::PixelType>::min();
-      for( it.GoToBegin(); !it.IsAtEnd(); ++it )
-        {
-        typename Image2DType::PixelType p = it.Get();
-        if( p > maxValue )
-          {
-          maxValue = p;
-          }
-        if( p < minValue )
-          {
-          minValue = p;
-          }
-        }
-      typename Image2DType::PixelType windowCenter = (minValue + maxValue) / 2;
-      typename Image2DType::PixelType windowWidth = (maxValue - minValue);
+  itk::ImageRegionIterator<Image2DType> it( extract->GetOutput(), extract->GetOutput()->GetLargestPossibleRegion() );
+  typename Image2DType::PixelType                minValue = itk::NumericTraits<typename Image2DType::PixelType>::max();
+  typename Image2DType::PixelType                maxValue = itk::NumericTraits<typename Image2DType::PixelType>::min();
+  for( it.GoToBegin(); !it.IsAtEnd(); ++it )
+    {
+    typename Image2DType::PixelType p = it.Get();
+    if( p > maxValue )
+      {
+      maxValue = p;
+      }
+    if( p < minValue )
+      {
+      minValue = p;
+      }
+    }
+  typename Image2DType::PixelType windowCenter = (minValue + maxValue) / 2;
+  typename Image2DType::PixelType windowWidth = (maxValue - minValue);
 
-      value.str("");
-      value << windowCenter;
-      itk::EncapsulateMetaData<std::string>(dictionary, "0028|1050", value.str() );
-      value.str("");
-      value << windowWidth;
-      itk::EncapsulateMetaData<std::string>(dictionary, "0028|1051", value.str() );
+  value.str("");
+  value << windowCenter;
+  itk::EncapsulateMetaData<std::string>(dictionary, "0028|1050", value.str() );
+  value.str("");
+  value << windowWidth;
+  itk::EncapsulateMetaData<std::string>(dictionary, "0028|1051", value.str() );
 
-      typename WriterType::Pointer writer = WriterType::New();
-      char                imageNumber[BUFSIZ];
+  typename WriterType::Pointer writer = WriterType::New();
+  char                imageNumber[BUFSIZ];
   #if WIN32
-  #define snprintf sprintf_s
+      #define snprintf sprintf_s
   #endif
-      snprintf(imageNumber, BUFSIZ, "%04d", i + 1);
-      value.str("");
-      value << outputDirectory << "/" << "IMG" << imageNumber << ".dcm";
-      writer->SetFileName(value.str().c_str() );
+  snprintf(imageNumber, BUFSIZ, "%04d", i + 1);
+  value.str("");
+  value << outputDirectory << "/" << "IMG" << imageNumber << ".dcm";
+  writer->SetFileName(value.str().c_str() );
 
-      writer->SetInput(extract->GetOutput() );
-      //writer->SetUseCompression(useCompression);
-      try
-        {
-        writer->SetImageIO(gdcmIO);
-        writer->Update();
-        }
-      catch( itk::ExceptionObject & excp )
-        {
-        std::cerr << "Exception thrown while writing the file " << std::endl;
-        std::cerr << excp << std::endl;
-        return EXIT_FAILURE;
-        }
+  writer->SetInput(extract->GetOutput() );
+  //writer->SetUseCompression(useCompression);
+  try
+    {
+    writer->SetImageIO(gdcmIO);
+    writer->Update();
+    }
+  catch( itk::ExceptionObject & excp )
+    {
+    std::cerr << "Exception thrown while writing the file " << std::endl;
+    std::cerr << excp << std::endl;
+    return EXIT_FAILURE;
+    }
+
   }
-
-
 
   return EXIT_SUCCESS;
 }
 
+// Function for reading the tag values
 std::string getTagValue(const std::string & entryId, const itk::MetaDataDictionary & inputDictionary)
-
 {
   typedef itk::MetaDataDictionary DictionaryType;
   typedef itk::MetaDataObject< std::string > MetaDataStringType;
@@ -240,8 +245,8 @@ std::string getTagValue(const std::string & entryId, const itk::MetaDataDictiona
 return tagvalue;
 }
 
-
-} // end of anonymous namespace
+}
+// end of anonymous namespace
 
 
 int main( int argc, char * argv[] )
