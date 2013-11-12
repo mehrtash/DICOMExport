@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Examples</category>
+  <title>DICOMExport</title>
+  <description><![CDATA[This is a CLI module (based on GaussianBlurImageFilter) bundled in an extension]]></description>
+  <version>0.0.1</version>
+  <documentation-url>http://www.slicer.org/slicerWiki/index.php/Documentation/4.3/Modules/MyCLIModule</documentation-url>
+  <license>Slicer</license>
+  <contributor>Julien Jomier (Kitware), Stephen Aylward (Kitware), Jean-Christophe Fillion-Robin (Kitware)</contributor>
+  <acknowledgements>This work was partially funded by NIH grant 3P41RR013218-12S1</acknowledgements>
+  <parameters>
+    <label>IO</label>
+    <description><![CDATA[Input/output parameters]]></description>
+    <image>
+      <name>inputVolume</name>
+      <label>Input Volume</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description><![CDATA[Input volume]]></description>
+    </image>
+    <directory>
+      <name>inputDirectory</name>
+      <longflag>--inputDirectory</longflag>
+      <description><![CDATA[The directory to contain the DICOM series.]]></description>
+      <label>Input DICOM Directory</label>
+      <default>./</default>
+    </directory>
+    <directory>
+    <name>outputDirectory</name>
+    <longflag>--outputDirectory</longflag>
+    <description><![CDATA[The directory to contain the DICOM series.]]></description>
+    <label>Output DICOM Directory</label>
+    <default>./</default>
+    </directory>
+  </parameters>
+</executable>
