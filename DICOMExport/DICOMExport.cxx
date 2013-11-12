@@ -135,7 +135,7 @@ int DoIt( int argc, char * argv[], T )
   value << i + 1;
   itk::EncapsulateMetaData<std::string>(dictionary, "0020|0013", value.str() );// Instance Number
   itk::EncapsulateMetaData<std::string>(dictionary, "0008|0008", std::string("ORIGINAL\\PRIMARY\\AXIAL") );  // Image Type
-  //itk::EncapsulateMetaData<std::string>(dictionary, "0008|0016", std::string("1.2.840.10008.5.1.4.1.1.2") ); // SOP Class UID
+  itk::EncapsulateMetaData<std::string>(dictionary, "0008|0016", std::string("1.2.840.10008.5.1.4.1.1.4") ); // SOP Class UID MR
   value.str("");
   value << oMatrix[0][0] << "\\" << oMatrix[1][0] << "\\" << oMatrix[2][0] << "\\";
   value << oMatrix[0][1] << "\\" << oMatrix[1][1] << "\\" << oMatrix[2][1];
