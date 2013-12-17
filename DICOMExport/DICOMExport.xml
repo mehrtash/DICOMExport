@@ -32,5 +32,21 @@
     <label>Output DICOM Directory</label>
     <default>./</default>
     </directory>
+    <string-enumeration>
+      <name>Modality</name>
+      <description><![CDATA[Type of transform to produce]]></description>
+      <label>Modality</label>
+      <longflag>modality</longflag>
+      <element>CT</element>
+      <element>MR</element>
+      <default>MR</default>
+    </string-enumeration>
+    <string>
+      <name>SeriesNumber</name>
+      <description><![CDATA[Type of transform to produce]]></description>
+      <label>Series Number</label>
+      <longflag>seriesNumber</longflag>
+      <default>99</default>
+    </string>
   </parameters>
 </executable>

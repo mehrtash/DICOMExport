@@ -75,10 +75,12 @@ int DoIt( int argc, char * argv[], T )
   typedef itk::MetaDataDictionary DictionaryType;
   DictionaryType & inputDictionary =gdcmIO->GetMetaDataDictionary()  ;
 
+  std::string  seriesDescription = getTagValue("0008|103e",inputDictionary);
   std::string  patientNameValue = getTagValue("0010|0010",inputDictionary);
   std::string  patientIDValue = getTagValue("0010|0020",inputDictionary);
   std::string  studyIDValue = getTagValue("0020|0010",inputDictionary);
   std::string  studyInstanceUIDValue = getTagValue("0020|000d",inputDictionary);
+
 
 
 // Read the input image
@@ -112,14 +114,18 @@ int DoIt( int argc, char * argv[], T )
 
   DictionaryType       dictionary;
 
+  std::string seriesN = SeriesNumber;
+
   for( unsigned int i = 0; i < numberOfSlices; i++ )
   {
-      // tag values from the input dicom directory
+  // tag values from the input dicom directory
+  itk::EncapsulateMetaData<std::string>(dictionary, "0020|0011", seriesN ); 
+  itk::EncapsulateMetaData<std::string>(dictionary, "0008|103e", seriesDescription.c_str() );
   itk::EncapsulateMetaData<std::string>(dictionary, "0010|0010", patientNameValue.c_str() );
   itk::EncapsulateMetaData<std::string>(dictionary, "0010|0020", patientIDValue.c_str() );
   itk::EncapsulateMetaData<std::string>(dictionary, "0020|0010", studyIDValue.c_str() );
   itk::EncapsulateMetaData<std::string>(dictionary, "0020|000d", studyInstanceUIDValue.c_str() );
-
+  
   itksys_ios::ostringstream value;
 
   typename Image3DType::PointType    origin;
@@ -135,7 +141,15 @@ int DoIt( int argc, char * argv[], T )
   value << i + 1;
   itk::EncapsulateMetaData<std::string>(dictionary, "0020|0013", value.str() );// Instance Number
   itk::EncapsulateMetaData<std::string>(dictionary, "0008|0008", std::string("ORIGINAL\\PRIMARY\\AXIAL") );  // Image Type
-  itk::EncapsulateMetaData<std::string>(dictionary, "0008|0016", std::string("1.2.840.10008.5.1.4.1.1.4") ); // SOP Class UID MR
+  if (Modality == "MR")
+  {
+    itk::EncapsulateMetaData<std::string>(dictionary, "0008|0016", std::string("1.2.840.10008.5.1.4.1.1.4") ); // SOP Class UID MR
+  }
+  else
+  {
+    itk::EncapsulateMetaData<std::string>(dictionary, "0008|0016", std::string("1.2.840.10008.5.1.4.1.1.2") ); // SOP Class UID CT
+  }
+
   value.str("");
   value << oMatrix[0][0] << "\\" << oMatrix[1][0] << "\\" << oMatrix[2][0] << "\\";
   value << oMatrix[0][1] << "\\" << oMatrix[1][1] << "\\" << oMatrix[2][1];
